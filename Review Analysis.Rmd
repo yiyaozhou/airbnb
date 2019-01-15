@@ -1,7 +1,7 @@
 ---
 title: "Text Mining Airbnb Reviews"
 always_allow_html: yes
-author: "Yutian Fang, Yiyao Zhou(Joy), Hanqing Yao, Abby Liu "
+author: "Yiyao Zhou, Yutian Fang""
 date: "April 2018"
 output:
   word_document: default
@@ -10,8 +10,7 @@ output:
   pdf_document: default
 ---
 
-
-First, we load the packages we need for this assignment.
+First, load the packages we need for this project.
 ```{r, warning=FALSE, message=FALSE}
 library(tidyverse)   # loads a number of helpful Hadley Wickham packages
 library(ggplot2)     # way better than Base plotting
@@ -30,10 +29,9 @@ library(magrittr)
 
 
 # 1. Create random subset
-We read csv file as “dataframe” and examine the structure of our dataframe. By cheking the comments, we found out it is needed to saperate english comments from comments in other comments. So we use textcat() function and create a new column to identify the languange of the comments. Then we used pipeline and filter() to select all english comments from "allreviews". We used sample() to selected 1200 data and created "reviews" as the dataframe. 
+By cheking the comments, it is needed to saperate english comments from comments in other comments. So  textcat() function is used to create a new column to identify the languange of the comments. Then we used pipeline and filter() to select all english comments from "allreviews". We selected 1200 data and created "reviews" as the dataframe. 
 
 ```{r, message=FALSE, echo=TRUE}
-setwd("~/case4-sp2018-group-h/Case4_Data")
 allreviews <- read.csv("reviews.csv")
 set.seed(123)
 # create a new column to identify the language of the comments
@@ -48,7 +46,7 @@ reviews <- allreviews[index, ]
 
 
 # 2. Cleaning data
-During the cleaning process, we create two functions: "qdap_clean" and "tm_clean". In qdap_clean() function, we omitted bracket, replaced number, abbreviation, contraction, and symbol. In tm_clean() function, we dealed with extra whitespace, removed numbers and punctuation, transformed uppercase letter to lowercase. In addition, we used all stopwords and added two extra word: "Boston" and "airbnb". As we are investigating houses in great boston area, the name of the location is little meaningful for the analysis. Also the people likes to mention airbnb, the name of the website, which also provide little information to us.
+During the cleaning process, two functions: "qdap_clean" and "tm_clean" were created. In qdap_clean() function, we omitted bracket, replaced number, abbreviation, contraction, and symbol. In tm_clean() function, we dealed with extra whitespace, removed numbers and punctuation, transformed uppercase letter to lowercase. In addition, we used all stopwords and added two extra word: "Boston" and "airbnb". As we are investigating houses in great boston area, the name of the location is little meaningful for the analysis. Also the people likes to mention airbnb, the name of the website, which also provide little information to us.
 
 ```{r}
 # Print the structure of reviews
@@ -108,7 +106,7 @@ barplot(term_frequency[1:15], col = "tan", las = 2)
 ```
 
 # 5. Bigrams
-Using the n-grams function and setting n to 2, we are examining pairs of two consecutive words. The most common bigrams shown in our analysis are "great location", "walking distance", "highly recommend", "place stay", and "definitely stay". Much as we discovered in the single-word plot, the vast majority is positive review that recommends on the geographical location and a second-time stay. Rather than capturing single words, pairs of words are able to provide context that makes tokens more understandable. For example, from the single-word analysis, we notice that most reviews are positive, but we don't know what exactly is being "great" or "nice" about the stay. On the other hand, bigrams are more useful by associating "great" with informative words like "location", "host"; giving meaning to word "stay" when combined with "definitely", and "enjoyed".
+The most common bigrams shown in our analysis are "great location", "walking distance", "highly recommend", "place stay", and "definitely stay". Much as we discovered in the single-word plot, the vast majority is positive review that recommends on the geographical location and a second-time stay. Rather than capturing single words, pairs of words are able to provide context that makes tokens more understandable. For example, from the single-word analysis, most reviews are positive, but we don't know what exactly is being "great" or "nice" about the stay. On the other hand, bigrams are more useful by associating "great" with informative words like "location", "host"; giving meaning to word "stay" when combined with "definitely", and "enjoyed".
 
 ```{r, warning = FALSE}
 
@@ -136,7 +134,7 @@ ggplot(head(freq.df,15), aes(reorder(word,freq), freq)) +
 ```
 
 # 6. Word Association:
-We have found the 8 words that have the highest correlation with "location" using the function findAssocs(). From the scatterplot, we see that "great" and "perfect" are the highest correlated words, followed by "fantastic", "convenient", "explore", "ideal", "sox", and "game". This finding confirms our bigrams plot, showing that "location" is usually mentioned together with positive words such as "great", "prefect", and "convenient" from Airbnb reviews. Moreover, it's worth mentioning that we see "sox" and "game" are among the highest correlated words. We assume that a number of visitors are Red Sox fans, and deliberately choose housing locations that are in proximity to the arena.
+From the word association analysis, there are 8 words that have the highest correlation with "location" using the function findAssocs(). From the scatterplot, we see that "great" and "perfect" are the highest correlated words, followed by "fantastic", "convenient", "explore", "ideal", "sox", and "game". This finding confirms our bigrams plot, showing that "location" is usually mentioned together with positive words such as "great", "prefect", and "convenient" from Airbnb reviews. Moreover, it's worth mentioning that we see "sox" and "game" are among the highest correlated words. We assume that a number of visitors are Red Sox fans, and deliberately choose housing locations that are in proximity to the arena.
 
 ```{r}
 # Create associations
