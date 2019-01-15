@@ -1,0 +1,367 @@
+---
+title: "Text Mining Airbnb Reviews"
+always_allow_html: yes
+author: "Yutian Fang, Yiyao Zhou(Joy), Hanqing Yao, Abby Liu "
+date: "April 2018"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+First, we load the packages we need for this assignment.
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)   # loads a number of helpful Hadley Wickham packages
+library(ggplot2)     # way better than Base plotting
+library(tidyr)       # newer replacement for package Reshape
+library(dbplyr)
+library(textcat)
+library(qdap)
+library(tm)
+library(RWeka)
+library(wordcloud)
+library(ggthemes)
+library(tidyverse)
+library(tidytext)
+library(magrittr)
+```
+
+
+# 1. Create random subset
+We read csv file as “dataframe” and examine the structure of our dataframe. By cheking the comments, we found out it is needed to saperate english comments from comments in other comments. So we use textcat() function and create a new column to identify the languange of the comments. Then we used pipeline and filter() to select all english comments from "allreviews". We used sample() to selected 1200 data and created "reviews" as the dataframe. 
+
+```{r, message=FALSE, echo=TRUE}
+setwd("~/case4-sp2018-group-h/Case4_Data")
+allreviews <- read.csv("reviews.csv")
+set.seed(123)
+# create a new column to identify the language of the comments
+allreviews$language <- textcat(allreviews$comments)
+# select the rows with English comments
+allreviews <- allreviews %>% 
+  filter(language == "english")
+# generate a random subset of the reviews
+index <- sample(c(1:dim(allreviews)[1]), 1200)  
+reviews <- allreviews[index, ]
+```
+
+
+# 2. Cleaning data
+During the cleaning process, we create two functions: "qdap_clean" and "tm_clean". In qdap_clean() function, we omitted bracket, replaced number, abbreviation, contraction, and symbol. In tm_clean() function, we dealed with extra whitespace, removed numbers and punctuation, transformed uppercase letter to lowercase. In addition, we used all stopwords and added two extra word: "Boston" and "airbnb". As we are investigating houses in great boston area, the name of the location is little meaningful for the analysis. Also the people likes to mention airbnb, the name of the website, which also provide little information to us.
+
+```{r}
+# Print the structure of reviews
+str(reviews)
+# Create comments
+comments <- as.character(reviews$comments)
+
+qdap_clean <- function(text){
+  text <- bracketX(text)
+  text <- replace_number(text)
+  text <- replace_abbreviation(text)
+  text <- replace_contraction(text)
+  text <- replace_symbol(text)
+  return(text)
+}
+
+tm_clean <- function(corpus){
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, 
+                   c(stopwords("en"),"boston", "airbnb"))
+  return(corpus)
+}
+
+comments_qd_cl <- qdap_clean(comments)
+# comments <- comments[!is.na(comments)]
+comments_corp <- VCorpus(VectorSource(comments_qd_cl))
+cl_comments_corp <- tm_clean(comments_corp)
+```
+
+# 3. Use TfIdf weighting to create a TermDocument Matrix.
+The result matrix have 4564 rows and 1200 columns.
+
+```{r}
+# Create tfidf_tdm
+tfidf_tdm <- TermDocumentMatrix(cl_comments_corp, control = list(weighting = weightTfIdf))
+# Create tfidf_tdm_m 
+tfidf_tdm_m <- as.matrix(tfidf_tdm)
+dim(tfidf_tdm_m)
+```
+
+# 4. Frequency
+As the chart shown, the main focus of choosing Airbnb is “place”, “location”, “apartment”, and “host”. Based on the bar chart, it is obvious that “great”, “nice”, “perfect”, and “clean” have comparable high frequency, which means most of the comments shows a positive sentiment for the house. Most of customers focus on the close distance of the house to attractions and they desire to live in a clean room with nice host. Among these data, an interesting thing is more apartment is provided than house rooms. These might because more apartments is provided through Airbnb than houses. 
+
+```{r}
+# Frequency
+# Calculate the rowSums: term_frequency
+term_frequency <- rowSums(tfidf_tdm_m)
+# Sort term_frequency in descending order
+term_frequency <- sort(term_frequency, decreasing = TRUE)
+# View the top 10 most common words
+head(term_frequency, 15)
+# Plot a barchart of the 10 most common words
+barplot(term_frequency[1:15], col = "tan", las = 2)
+```
+
+# 5. Bigrams
+Using the n-grams function and setting n to 2, we are examining pairs of two consecutive words. The most common bigrams shown in our analysis are "great location", "walking distance", "highly recommend", "place stay", and "definitely stay". Much as we discovered in the single-word plot, the vast majority is positive review that recommends on the geographical location and a second-time stay. Rather than capturing single words, pairs of words are able to provide context that makes tokens more understandable. For example, from the single-word analysis, we notice that most reviews are positive, but we don't know what exactly is being "great" or "nice" about the stay. On the other hand, bigrams are more useful by associating "great" with informative words like "location", "host"; giving meaning to word "stay" when combined with "definitely", and "enjoyed".
+
+```{r, warning = FALSE}
+
+tokenizer <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 2, max = 2))
+# Create bi_tdm
+bi_tdm <- TermDocumentMatrix(cl_comments_corp, control = list(tokenize = tokenizer))
+# Create bi_tdm_m
+bi_tdm_m <- as.matrix(bi_tdm)
+# Create bi_freq
+bi_freq <- rowSums(bi_tdm_m)
+bi_freq <- sort(bi_freq, decreasing = TRUE)
+head(bi_freq, 10)
+# Plot a wordcloud using bi_freq values
+freq.df = data.frame(word=names(bi_freq), freq=bi_freq)
+pal=brewer.pal(8,"Blues")
+pal=pal[-(1:3)]
+wordcloud(freq.df$word,freq.df$freq,max.words=100,random.order = F, colors=pal)
+
+# Plot the most frequent bigrams in a bar graph
+ggplot(head(freq.df,15), aes(reorder(word,freq), freq)) +
+  geom_bar(stat = "identity") + coord_flip() +
+  xlab("Bigrams") + ylab("Frequency") +
+  ggtitle("Most frequent bigrams")
+```
+
+# 6. Word Association:
+We have found the 8 words that have the highest correlation with "location" using the function findAssocs(). From the scatterplot, we see that "great" and "perfect" are the highest correlated words, followed by "fantastic", "convenient", "explore", "ideal", "sox", and "game". This finding confirms our bigrams plot, showing that "location" is usually mentioned together with positive words such as "great", "prefect", and "convenient" from Airbnb reviews. Moreover, it's worth mentioning that we see "sox" and "game" are among the highest correlated words. We assume that a number of visitors are Red Sox fans, and deliberately choose housing locations that are in proximity to the arena.
+
+```{r}
+# Create associations
+associations <- findAssocs(tfidf_tdm, "location", 0.10)
+# View the venti associations
+associations
+# Create associations_df
+associations_df <- list_vect2df(associations)[, 2:3]
+# Plot the associations_df values (don't change this)
+ggplot(associations_df, aes(y = associations_df[, 1])) + 
+  geom_point(aes(x = associations_df[, 2]), 
+             data = associations_df, size = 3) + 
+  theme_gdocs()
+
+library(igraph)
+# Association network with correlation limits
+relation <- data.frame(from = "location", to = associations_df$X2, weight = associations_df$X3)
+ass <- graph.data.frame(relation, direct = T)
+set.seed(668)
+plot(ass,
+     vertex.color = "yellow",
+     vertex.label.color = "black",
+     vertex.frame.color = "white",
+     edge.color = "red",
+     vertex.size = 20,
+     vertex.label.color = 0.6,
+     edge.arrow.size = 0.3,
+     edge.width = E(ass)$weight*15)
+# Add title
+title(main = "Airbnb Reviews Associated with Location")
+
+```
+
+# 7. Bing
+First we find a sentiment score for each word using the BING lexicon and inner_join() function. Then we count up how many positive and negative words, and we have 5989 positive and 576 negative words. While the negative terms accounts for less than 10% of the positive terms, we decide to reduce the number of positive words and make it more balanced against the number of negative words. Next, we therefore use the total counts of positive comments divided by the "inflation rate" (1.5), and look more into details with the negative comments. As the pyramid plot shown below, the most common words in negative comments are "problem", "issues", "issue", "expensive" and "noise"; the most frequent positive words are similar to what we have found above, for instance, words such as "great", "nice", "clean" and "good".
+
+```{r}
+# Qdap polarity
+# bos_pol <- polarity(comments)
+# Get Bing lexicon
+comments_tib <- tidy(tfidf_tdm)
+bing <- get_sentiments("bing")
+# Join text to lexicon
+comments_bing_words <- inner_join(comments_tib, bing, by = c("term" = "word"))
+# Examine
+comments_bing_words
+# Get counts by sentiment
+comments_bing_words %>%
+  count(sentiment)
+inflation_rate <- 1.5
+# From Datacamp Sentiment -Ch3.4 with qdap
+# Tidy sentiment calculation
+comments_tidy_sentiment <- comments_bing_words %>% 
+  count(term, sentiment, wt = count) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(polarity = positive / inflation_rate - negative)
+
+# Sentiment calculation by document
+comments_tidy_sentiment.document <- comments_bing_words %>% 
+  count(document, sentiment, wt = count) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(polarity = positive / inflation_rate - negative)
+
+# Review
+comments_tidy_sentiment
+
+# Split sample into positive and negative comments
+clean.comments.df <- data.frame(text = sapply(cl_comments_corp, as.character), stringsAsFactors = FALSE)
+clean.comments.df$number <- c(1:nrow(clean.comments.df))
+# Subset positive comments 
+pos.bing <- subset(comments_tidy_sentiment.document, polarity > 0)
+pos.bing <- clean.comments.df[clean.comments.df$number %in% pos.bing$document,]
+# Subset negative comments
+neg.bing <- subset(comments_tidy_sentiment.document, polarity < 0)
+neg.bing <- clean.comments.df[clean.comments.df$number %in% neg.bing$document,]
+# Paste and collapse the positive comments
+pos_terms.bing <- paste(as.character(pos.bing$text), collapse = " ")
+# Paste and collapse the negative comments
+neg_terms.bing <- paste(as.character(neg.bing$text), collapse = " ")
+# Concatenate the terms
+all_terms.bing <- c(pos_terms.bing, neg_terms.bing)
+bing.tdm <- TermDocumentMatrix(VCorpus(VectorSource(all_terms.bing)))
+bing.tdm_m <- as.matrix(bing.tdm)
+
+# Create common_words
+common_words.bing <- subset(bing.tdm_m, bing.tdm_m[, 1] > 0 & bing.tdm_m[, 2] > 0)
+
+# Create difference
+difference.bing <- abs(common_words.bing[, 1] - common_words.bing[, 2])
+# Add difference to common_words
+common_words.bing <- cbind(common_words.bing, difference.bing)
+# Order the data frame from most differences to least
+common_words.bing <- common_words.bing[order(common_words.bing[, 3], decreasing = TRUE), ]
+# Create top15_df
+top15_df.bing <- data.frame(x = common_words.bing[1:15, 1], 
+                       y = common_words.bing[1:15, 2], 
+                       labels = rownames(common_words.bing[1:15, ]))
+# Create the pyramid plot
+library(plotrix)
+pyramid.plot(top15_df.bing$x, top15_df.bing$y, 
+             labels = top15_df.bing$labels, gap = 250, 
+             top.labels = c("Positive", "Words", "Negative"), 
+             main = "Words in Common using Bing Lexicon", unit = NULL)
+
+```
+
+# 8. Afinn
+Unlike BING lexicon which categorizes words into binary categories as either positive or negative, the AFINN lexicon measures sentiment with a numeric score between -5 and 5 (with negative scores indicating negative sentiment and positive scores indicating positive sentiment). Comparing to the words found using BING approach, the most common positive words are quite similar; whereas the negative words exhibit a slightly different pattern. Using AFINN, now we have additional negative words such as "stop", "blocks”, “uncomfortable", and we are missing the important word "expensive" among negative reviews.
+```{r}
+# Subset to AFINN
+afinn_lex <- get_sentiments("afinn")
+
+comments_afinn_words <- inner_join(comments_tib, afinn_lex, by = c("term" = "word")) %>%
+  mutate(sentiment = ifelse(score < 0, "negative", "positive"))
+
+comments_tidy_sentiment_afinn <- comments_afinn_words %>% 
+  count(term, sentiment, wt = count) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(polarity = positive / inflation_rate - negative)
+
+# Sentiment calculation by document
+comments_tidy_sentiment_afinn.document <- comments_afinn_words %>% 
+  count(document, sentiment, wt = count) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(polarity = positive / inflation_rate - negative)
+
+# Review
+comments_tidy_sentiment_afinn
+
+# Subset positive comments 
+pos.afinn <- subset(comments_tidy_sentiment_afinn.document, polarity > 0)
+pos.afinn <- clean.comments.df[clean.comments.df$number %in% pos.afinn$document,]
+# Subset negative comments
+neg.afinn <- subset(comments_tidy_sentiment_afinn.document, polarity < 0)
+neg.afinn <- clean.comments.df[clean.comments.df$number %in% neg.afinn$document,]
+# Paste and collapse the positive comments
+pos_terms.afinn <- paste(as.character(pos.afinn$text), collapse = " ")
+# Paste and collapse the negative comments
+neg_terms.afinn <- paste(as.character(neg.afinn$text), collapse = " ")
+# Concatenate the terms
+all_terms.afinn <- c(pos_terms.afinn, neg_terms.afinn)
+afinn.tdm <- TermDocumentMatrix(VCorpus(VectorSource(all_terms.afinn)))
+afinn.tdm_m <- as.matrix(afinn.tdm)
+
+# Create common_words
+common_words.afinn <- subset(afinn.tdm_m, afinn.tdm_m[, 1] > 0 & afinn.tdm_m[, 2] > 0)
+
+# Create difference
+difference.afinn <- abs(common_words.afinn[, 1] - common_words.afinn[, 2])
+# Add difference to common_words
+common_words.afinn <- cbind(common_words.afinn, difference.afinn)
+# Order the data frame from most differences to least
+common_words.afinn <- common_words.afinn[order(common_words.afinn[, 3], decreasing = TRUE), ]
+# Create top15_df
+top15_df.afinn <- data.frame(x = common_words.afinn[1:15, 1], 
+                       y = common_words.afinn[1:15, 2], 
+                       labels = rownames(common_words.afinn[1:15, ]))
+# Create the pyramid plot
+library(plotrix)
+pyramid.plot(top15_df.afinn$x, top15_df.afinn$y, 
+             labels = top15_df.afinn$labels, gap = 250, 
+             top.labels = c("Positive", "Words", "Negative"), 
+             main = "Words in Common using AFINN", unit = NULL)
+
+```
+
+# 9. Comparison
+The bars on each side reflect the frequency each common word shown in the different comments. Except for the "great", along with words that are shown frequently in negative comments like "house" and "room", the most common words shown in both graphs are "stay", "place", "location" and "apartment", which make sense as both houseowners and lodgers are mainly concerned about the house itself. The reason why "great" shows so frequently is mainly because the word is so colloquial and probably lodgers tend to be euphemistic when they write negative reviews and the logic might be applied to other positive words like "clean", "nice", etc. In general, the fact that common words shown much more frequently could be explained both by the absolutly large portion of positive comments and lodgers' "politeness". However, it could be hard to idensify the significant advantage of one lexicon over the other as the distribution and common words are very similar. We would like to use ggplot to help us make decision on choosing which lexicon is better. 
+
+Another way to plot
+```{r}
+# Subset
+comments_tidy_small <- comments_tidy_sentiment %>% 
+  filter(abs(polarity) >= 2)
+# Add polarity
+comments_tidy_pol <- comments_tidy_small %>% 
+  mutate(
+    pol = ifelse(polarity > 0, "positive", "negative")
+  )
+# Plot
+ggplot(
+  comments_tidy_pol, 
+  aes(reorder(term, polarity), polarity, fill = pol)
+) +
+  geom_bar(stat = "identity") + 
+  ggtitle("Boston Airbnb Reviews: Sentiment Word Frequency") + 
+  theme_gdocs() +
+  theme(axis.text.x = element_text(angle = 90, vjust = -0.1, size = 7))
+
+# Subset
+comments_tidy_small_afinn <- comments_tidy_sentiment_afinn %>% 
+  filter(abs(polarity) >= 2)
+# Add polarity
+comments_tidy_pol_afinn <- comments_tidy_small_afinn %>% 
+  mutate(
+    pol = ifelse(polarity > 0, "positive", "negative")
+  )
+# Plot
+ggplot(
+  comments_tidy_pol_afinn, 
+  aes(reorder(term, polarity), polarity, fill = pol)
+) +
+  geom_bar(stat = "identity") + 
+  ggtitle("Boston Airbnb Reviews: Sentiment Word Frequency") + 
+  theme_gdocs() +
+  theme(axis.text.x = element_text(angle = 90, vjust = -0.1, size = 7))
+
+```
+Using bing
+```{r}
+#Count terms by sentiment then spread
+poe_tidy <- comments_bing_words %>% 
+  count(sentiment, term = term) %>% 
+  spread(sentiment, n, fill = 0) %>%
+  as.data.frame()
+#Set row names
+rownames(poe_tidy) <- poe_tidy[, 1]
+#Drop terms column
+poe_tidy[, 1] <- NULL
+#Comparison cloud
+comparison.cloud(poe_tidy, max.words = 50, title.size = 1.0)
+```
+We finally decide on Bing-lexicon approach as it captures words that are more informative rather than common English terms. Moreover, Bing-lexicon ensures polarity and inflation rate, which helps more accurately assign words into positive and negative sentiments.
+
+# 10. Conclusion
+There is a significant difference in terms of the numbers of positive and negative Airbnb reviews. In our two lexicons analysis, we found the negative words constitute more than 90% of the total reviews. Even though we tried to reduce this large gap using the number of positive words divided by the inflation rate, the number of positive reviews still outweighs by a large percent. In addition, as the pyramid plots shown, the positive terms display a much higher intensity than the negative terms do. This could be caused by the disproportionate number of positive and negative reviews, or it could be that people tend to leave positive reviews with much longer and detailed sentences; whereas when people are disappointed about their stay, they tend to just leave simple phrases or few sentences. 
+Combing our findings from the single-word and bigrams, we see that the majority of Boston Airbnb reviews is positive, and the guests are happy about their staying in terms of the convenient location, great place and hosts. We would conclude that most people only write about positive reviews on Airbnb, or at least most Airbnb housings in Boston have a pretty high quality and satisfaction rate.
+
