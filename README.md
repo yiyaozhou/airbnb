@@ -7,7 +7,7 @@ Using the reviews provided in the csv file called “reviews.csv”, which is av
 3.	Use TfIdf weighting to create a TermDocument Matrix. In a sentence, report on the dimensions of the resulting matrix (#rows, #columns).
 4.	Create and display a well-labeled bar chart of the 15-20 most frequent terms in the reviews. 
 5.	Identify the most common bigrams in your sample. 
-6.	Find word associations (findAssocs() in tm) and create a word network plot to find words associated with the term “location”  (similar to example shown in the DataCamp Bag of Words, Chapter 2).
+6.	Find word associations (findAssocs() in tm) and create a word network plot to find words associated with the term “location”.
 7.	Use the BING lexicon to assign positive or negative sentiments to terms, and split your sample into positive and negative comments. Make a pyramid plot to compare the most common terms in positive vs. negative reviews. 
 8.	Repeat the prior step using the FINN lexicon.
 9.	Consider and discuss the merits of the two lexicons in this use case. Create a comparison cloud that contrasts the positive and negative terms in your sample. 
