@@ -1,6 +1,6 @@
 # Analysis using data from Airbnb
 ## Review Analysis
-Using the reviews provided in the csv file called “reviews.csv”, which is available in GitHub in compressed form. This file contains approximately 178,000 reviews of properties in the Boston area. In this file, we have very little information about the properties—we really just have a date and a review. I used qdap, tm , tidytext and RWeka to perform an analysis.
+Using the reviews provided in the csv file called “reviews.csv”, which is available in GitHub in compressed form. This file contains approximately 178,000 reviews of properties in the Boston area. In this file, we have very little information about the properties—we really just have a date and a review. I used qdap, tm, tidytext and RWeka to perform an analysis.
 0.	Set a random seed before Step 1 so that the results are fully reproducible.
 1.	Because the number of reviews is so enormous, select a random subset of 1,000 reviews for analysis in this case.
 2.	Perform the usual cleaning steps of removing numbers, punctuation, and stop words. The document briefly discusses the team decisions about adding or dropping stop words.
